@@ -25,7 +25,6 @@ jobs:
         - pantheon-repo-
     - run:
         name: Checkout site repository from Pantheon
-        no_output_timeout: 60m
         command: |
           # Ensure that there's a Pantheon repo locally. If one was not
           # restored from cache, clone it fresh.
