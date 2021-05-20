@@ -1,9 +1,126 @@
-version: 2.1
+# Orb 'pantheon-systems/pantheon@0.5.2' resolved to 'pantheon-systems/pantheon@0.5.2'
+version: 2
+jobs:
+  pantheon/push:
+    docker:
+    - image: quay.io/pantheon-public/build-tools-ci:6.x
+    resource_class: medium
+    working_directory: ~/sitedir
+    environment:
+    - TZ: /usr/share/zoneinfo/America/Los_Angeles
+    - BUILD_TOOLS_VERSION: dev-option-for-no-force
+    - TERM: dumb
+    - PANTHEON_REPO_DIR: /tmp/pantheon_repo
+    steps:
+    - checkout
+    - run:
+        name: Derive additional environment variables
+        command: /build-tools-ci/scripts/set-environment
+    - run:
+        name: Authenticate with Pantheon's CLI using a machine token
+        command: terminus -n auth:login --machine-token="$TERMINUS_TOKEN"
+    - restore_cache:
+        keys:
+        - pantheon-repo-{{ .Branch }}
+        - pantheon-repo-
+    - run:
+        name: Checkout site repository from Pantheon
+        no_output_timeout: 60m
+        command: |
+          # Ensure that there's a Pantheon repo locally. If one was not
+          # restored from cache, clone it fresh.
+          if [ ! -d "$PANTHEON_REPO_DIR/.git" ]; then
+            mkdir $PANTHEON_REPO_DIR
+            cd $PANTHEON_REPO_DIR
+            git init
+            git remote add pantheon $(terminus connection:info $TERMINUS_SITE.dev --field=git_url)
+            # Make the BitBucket or GitHub url be the origin so that Build Tools sets
+            # that url appropriately in the metadata file.
+            git remote add origin $CIRCLE_REPOSITORY_URL
+            git remote -v
+          fi
+
+          git fetch pantheon
+
+          # If the current branch is on Pantheon, check it out.
+          # If it is not, checkout master and then make a new branch.
+          if git ls-remote pantheon | grep "refs/heads/$TERMINUS_ENV$" > /dev/null; then
+            git checkout $TERMINUS_ENV
+            git pull
+          else
+            git checkout master
+            git pull
+            git checkout -b $TERMINUS_ENV
+          fi
+    - save_cache:
+        key: pantheon-repo-{{ .Branch }}
+        paths:
+        - $PANTHEON_REPO_DIR
+    - run:
+        name: Delete old Multidevs if this build needs to create a new one
+        command: |
+          if [[ $TERMINUS_ENV = ci-* || $TERMINUS_ENV = pr-*   ]]
+          then
+              echo "May need to delete old ci- or pr- environments to make room for this one"
+              echo "Getting list of all environments"
+              export ENV_LIST=$(terminus env:list $TERMINUS_SITE --field=id)
+              echo "Checking if current environment is in list of existing environments"
+              if [[ $(echo "${ENV_LIST}" | grep -x ${TERMINUS_ENV})  ]]
+              then
+                  echo "${TERMINUS_ENV} found in the list of environments"
+                  exit 0
+              else
+                  echo "${TERMINUS_ENV} not found in the list of environments."
+                  echo "Running clean-up script to delete old pr- environments"
+                  terminus -n build:env:delete:pr "$TERMINUS_SITE" --yes
+                  if [[ $TERMINUS_ENV = ci-*  ]]
+                  then
+                      echo "Running clean-up script to delete old ci- environments"
+                      terminus -n build:env:delete:ci "$TERMINUS_SITE" --keep=2 --yes
+                  else
+                      echo "Skipping deletion of ci- envs"
+                  fi
+              fi
+          fi
+    - run:
+        name: Copy code to the local clone of the Pantheon repository
+        command: |
+          rsync -av --exclude='.git'  ./ $PANTHEON_REPO_DIR  --delete
+          # For easier debugging, show what files have changed.
+          git -C $PANTHEON_REPO_DIR status
+    - run:
+        name: Commit code to Pantheon repository and push to Pantheon
+        no_output_timeout: 10m
+        command: |
+          export COMMIT_MSG=$(git log -1 --pretty=%B)
+          cd $PANTHEON_REPO_DIR
+          if [ "true" = "true" ] ; then
+            export CLONE_CONTENT="--clone-content"
+          else
+            export CLONE_CONTENT=""
+          fi
+          # This command will commit any changed files and push to Pantheon.
+          # New multidevs will be created as necessary.
+          terminus -n build:env:create "$TERMINUS_SITE.live" "$TERMINUS_ENV" --yes $CLONE_CONTENT --message="CI: $COMMIT_MSG"
+    - run:
+        name: Copy environment variables to persist to workspace for use in subsequent jobs.
+        command: cp $BASH_ENV bash_env.txt
+    - persist_to_workspace:
+        root: .
+        paths:
+        - bash_env.txt
 workflows:
   version: 2
   just_push:
-      jobs:
-      - pantheon/push
-orbs:
-  pantheon: pantheon-systems/pantheon@0.5.2
+    jobs:
+    - pantheon/push
 
+# Original config.yml file:
+# version: 2.1
+# workflows:
+#   version: 2
+#   just_push:
+#       jobs:
+#       - pantheon/push
+# orbs:
+#   pantheon: pantheon-systems/pantheon@0.5.2
