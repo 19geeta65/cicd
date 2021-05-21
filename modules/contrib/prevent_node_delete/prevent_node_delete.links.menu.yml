@@ -1,0 +1,6 @@
+prevent_node_delete.settings:
+  title: 'Prevent Node Delete settings'
+  description: 'Prevent Node Delete settings'
+  route_name: prevent_node_delete.settings
+  parent: 'system.admin_config_development'  
+  weight: 1

@@ -1,0 +1,5 @@
+prevent_node_delete administration:
+ title: 'Administer prevent node delete'
+ description: 'Perform administration of Prevent Node Delete'
+ restrict access: false
+ 

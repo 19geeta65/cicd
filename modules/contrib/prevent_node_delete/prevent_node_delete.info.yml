@@ -1,0 +1,10 @@
+name: Prevent Node Delete
+description: 'Prevent deletion of Node if associated with the entity'
+package: 'Node'
+core: 8.x
+type: module
+configure: prevent_node_delete.settings
+# Information added by Drupal.org packaging script on 2019-12-05
+version: '8.x-1.0-alpha3'
+project: 'prevent_node_delete'
+datestamp: 1575541965

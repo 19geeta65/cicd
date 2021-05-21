@@ -1,0 +1,4 @@
+prevent_node_delete.settings: # The first plugin ID
+  title: 'Prevent Node Delete Settings'
+  route_name: prevent_node_delete.settings
+  base_route: system.admin_config_development

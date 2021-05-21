@@ -1,0 +1,7 @@
+prevent_node_delete.settings:
+ path: 'admin/config/development/prevent_node_delete'
+ defaults:
+  _form: '\Drupal\prevent_node_delete\Form\PreventNodeDeleteSettingsForm'
+  _title: 'Prevent Node Delete Settings'
+ requirements:
+  _permission: 'prevent_node_delete administration'
